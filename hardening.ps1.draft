@@ -1,0 +1,444 @@
+# Provide the username and password of an account on your ESXi hosts.
+# Provide the name of your vCenter Server
+$esxusername = "root"
+$esxpassword = "VMware1!"
+$vCenterServer = "vcsa.lab.local"
+
+#Ensure all connections are dropped.
+Disconnect-VIServer -Force -server * -Confirm:$false
+
+# You may need to provide the username and password of your vCenter server below
+connect-viserver $vCenterServer
+$esxihosts = get-vmhost
+
+
+#Audit the list of users who are on the Exception Users List and whether the have administrator privleges
+#Sample code to check each local user on an ESXi host
+#against the list in vCenter's exception user list. Also checks
+#to see if the local user has administrator privleges.
+foreach ($esxihost in $esxihosts)
+{
+    Write-Host "Host is: " $esxihost
+    Write-host "Exception Users from vCenter"
+    $myhost = Get-VMHost $esxihost | Get-View
+    $lockdown = Get-View $myhost.ConfigManager.HostAccessManager
+    $LDusers = $lockdown.QueryLockdownExceptions()
+    Write-host $LDusers
+
+# Connect to each ESXi host in the cluster to retrieve the list of local users.
+#Write-Host "Lockdown user: " $LDuser
+#Write-host "Connecting to: " $esxihost
+#Connect-VIServer -Server $esxihost -user $esxusername -Password $esxpassword
+
+#Loop through the list of Exception Users and check to see if they have accounts on
+#the ESXi server and if that account in an administrator account.
+#foreach ($LDuser in $LDusers)
+#    {
+#
+#    Write-host "Get-vmhostaccount"
+#    $hostaccountname = get-vmhostaccount   -ErrorAction SilentlyContinue  $LDuser
+#    write-host "Check to see if user exists"
+#    if ($hostaccountname.Name)
+#    Write-Host $hostaccountname.Name
+#        {
+#        Write-Host "Get-VIPermission"
+#        $isadmin = Get-VIPermission -Principal $LDuser -ErrorAction SilentlyContinue | Where {$_.Role –eq “Admin”} 
+#        Write-host "Admin Role: " $isadmin.Role
+#        if ($isadmin.Role -eq "Admin") {Write-Host $LDuser is an "Exception User with Admin accounts on " $esxihost}
+#        }
+#     Disconnect-VIServer -Server $global:DefaultVIServer -Force  -Confirm:$false
+#    
+#    }
+}
+
+
+# Ensure that the SSH default disablement has not been changed
+# Check to see if the SSH Server Is running
+foreach ($VMhost in (Get-VMHost))
+{
+    $ServiceList = Get-VMHostService -VMhost $VMhost
+    $SSHservice = $ServiceList | Where-Object {$_.Key -eq "TSM-SSH"}
+    If ($SSHservice.Running -eq $true) {
+        Write-Output "SSH Server on host $VMhost is running"
+    }
+    else {
+        Write-Output "SSH Server on host $VMhost is Stopped"
+    }
+}
+
+
+# Configure NTP time synchronization
+# List the NTP Settings for all hosts 
+Get-VMHost | Select Name, @{N="NTPSetting";E={$_ | Get-VMHostNtpServer}}"
+
+# Set the NTP Settings for all hosts
+#$NTPServers = "pool.ntp.org", "pool2.ntp.org"
+#Get-VMHost | Add-VmHostNtpServer $NTPServers"
+
+#Configure persistent logging for all ESXi host
+# List Syslog.global.logDir for each host
+Get-VMHost | Select Name, @{N="Syslog.global.logDir";E={$_ | Get-VMHostAdvancedConfiguration Syslog.global.logDir | Select -ExpandProperty Values}}"
+# Set Syslog.global.logDir for each host
+#Get-VMHost | Foreach { Set-VMHostAdvancedConfiguration -VMHost $_ -Name Syslog.global.logDir -Value "NewLocation" }"
+
+# Ensure proper SNMP configuration
+# List the SNMP Configuration of a host (single host connection required)
+Get-VMHost | Get-VMHostSnmp"
+# Update the host SNMP Configuration (single host connection required)
+#Get-VmHostSNMP | Set-VMHostSNMP -Enabled:$true -ReadOnlyCommunity 'secret'"
+
+#Disable Managed Object Browser (MOB)
+Get-VMHost <host> | Get-AdvancedSetting -Name Config.HostAgent.plugins.solo.enableMob
+#Get-VMHost <host> | Get-AdvancedSetting -Name Config.HostAgent.plugins.solo.enableMob |Set-AdvancedSetting -value "false"
+
+Disable TLS 1.0 and 1.1 on ESXi Hosts if necessary
+#"Get-VMHost | Get-AdvancedSetting -Name UserVars.ESXiVPsDisabledProtocols"
+#Get-VMHost | Get-AdvancedSetting -Name UserVars.ESXiVPsDisabledProtocols | Set-AdvancedSetting -Value "sslv3,tlsv1,tlsv1.1"
+Use Active Directory for local user authentication
+#"# Check each host and their domain membership status
+Get-VMHost | Get-VMHostAuthentication | Select VmHost, Domain, DomainMembershipStatus"
+#"# Join the ESXI Host to the Domain
+Get-VMHost  | Get-VMHostAuthentication | Set-VMHostAuthentication -Domain $domain -User $username -Password $password -JoinDomain"
+When adding ESXi hosts to Active Directory use the vSphere Authentication Proxy to protect passwords
+#"# Check the host profile is using vSphere Authentication proxy to add the host to the domain
+Get-VMHost | Select Name, ` @{N="HostProfile";E={$_ | Get-VMHostProfile}}, ` @{N="JoinADEnabled";E={($_ | Get-VmHostProfile).ExtensionData.Config.ApplyProfile.Authentication.ActiveDirectory.Enabled}}, ` @{N="JoinDomainMethod";E={(($_ | Get-VMHostProfile).ExtensionData.Config.ApplyProfile.Authentication.ActiveDirectory | Select -ExpandProperty Policy | Where {$_.Id -eq "JoinDomainMethodPolicy"}).Policyoption.Id}}# Check each host and their domain membership statusGet-VMHost | Get-VMHostAuthentication | Select VmHost, Domain, DomainMembershipStatus"
+#"# Join the ESXI Host to the Domain
+Get-VMHost HOST1 | Get-VMHostAuthentication | Set-VMHostAuthentication -Domain domain.local -User Administrator -Password Passw0rd -JoinDomain"
+Enable bidirectional CHAP, also known as Mutual CHAP, authentication for iSCSI traffic
+#"# List Iscsi Initiator and CHAP Name if defined
+Get-VMHost | Get-VMHostHba | Where {$_.Type -eq "Iscsi"} | Select VMHost, Device, ChapType, @{N="CHAPName";E={$_.AuthenticationProperties.ChapName}}"
+#"# Set the Chap settings for the Iscsi Adapter
+Get-VMHost | Get-VMHostHba | Where {$_.Type -eq "Iscsi"} | Set-VMHostHba # Use desired parameters here"
+Enable Normal Lockdown Mode to restrict access
+#"# To check if Lockdown mode is enabled
+Get-VMHost | Select Name,@{N="Lockdown";E={$_.Extensiondata.Config.adminDisabled}}"
+#"# Enable lockdown mode for each host
+Get-VMHost | Foreach { $_.EnterLockdownMode() } "
+Configure remote logging for ESXi hosts 
+#Get-VMHost | Get-AdvancedSetting -Name Syslog.global.logHost
+#"Get-VMHost | Get-AdvancedSetting -Name Syslog.global.logHost | Set-AdvancedSetting -Value "<insert syslog server hostname>""
+Enable Strict lockdown mode to restrict access
+#"# To check if Lockdown mode is enabled
+Get-VMHost | Select Name,@{N="Lockdown";E={$_.Extensiondata.Config.adminDisabled}}
+
+#To display the mode 
+$esxihosts = get-vmhost
+foreach ($esxihost in $esxihosts)
+  {
+$myhost = Get-VMHost $esxihost | Get-View
+$lockdown = Get-View $myhost.ConfigManager.HostAccessManager
+Write-Host "——————————–"
+$lockdown.UpdateViewData()
+$lockdownstatus = $lockdown.LockdownMode
+Write-Host "Lockdown mode on $esxihost is set to $lockdownstatus"
+Write-Host "——————————–"
+}"
+#"#Run this at the vCenter level or against an individual host
+#Create HostLockdownMode object
+$level = New-Object VMware.Vim.HostLockdownMode
+#Populate with level of lockdown:(lockdownDisabled,lockdownNormal,lockdownStrict)
+$level = "lockdownStrict"
+$esxihosts = get-vmhost
+foreach ($esxihost in $esxihosts)
+  {
+$myhost = Get-VMHost $esxihost | Get-View
+$lockdown = Get-View $myhost.ConfigManager.HostAccessManager
+Write-Host "——————————–"
+Write-Host "Setting Lockdown mode to " $level
+$lockdown.ChangeLockdownMode($level)
+$lockdown.UpdateViewData()
+$lockdownstatus = $lockdown.LockdownMode
+Write-Host "Lockdown mode on $esxihost is set to $lockdownstatus"
+Write-Host "——————————–"
+  } "
+Configure the ESXi host firewall to restrict access to services running on the host 
+#"# List the services which are enabled and have rules defined for specific IP ranges to access the service
+Get-VMHost  | Get-VMHostFirewallException | Where {$_.Enabled -and (-not $_.ExtensionData.AllowedHosts.AllIP)}
+
+# List the services which are enabled and do not have rules defined for specific IP ranges to access the service
+Get-VMHost  | Get-VMHostFirewallException | Where {$_.Enabled -and ($_.ExtensionData.AllowedHosts.AllIP)}"
+#N/A
+Set the time after which a locked account is automatically unlocked
+#Get-VMHost | Get-AdvancedSetting -Name Security.AccountUnlockTime
+#Get-VMHost | Get-AdvancedSetting -Name Security.AccountUnlockTime | Set-AdvancedSetting -Value 900
+Set the count of maximum failed login attempts before the account is locked out
+#Get-VMHost | Get-AdvancedSetting -Name Security.AccountLockFailures
+#Get-VMHost | Get-AdvancedSetting -Name Security.AccountLockFailures | Set-AdvancedSetting -Value 3
+Set DCUI.Access to allow trusted users to override lockdown mode
+#Get-VMHost | Get-AdvancedSetting -Name DCUI.Access
+#"Get-VMHost | Get-AdvancedSetting -Name DCUI.Access | Set-AdvancedSetting -Value "root""
+Audit DCUI timeout value
+#Get-VMHost | Get-AdvancedSetting -Name UserVars.DcuiTimeOut
+#Get-VMHost | Get-AdvancedSetting -Name UserVars.DcuiTimeOut | Set-AdvancedSetting -Value 600
+Establish a password policy for password complexity
+#Get-VMHost | Get-AdvancedSetting -Name Security.PasswordQualityControl
+#"Get-VMHost | Get-AdvancedSetting -Name Security.PasswordQualityControl | Set-AdvancedSetting -Value "similar=deny retry=3 min=disabled,disabled,disabled,disabled,15""
+Set a timeout to automatically terminate idle ESXi Shell and SSH sessions
+#Get-VMHost | Get-AdvancedSetting -Name UserVars.ESXiShellInteractiveTimeOut
+#Get-VMHost | Get-AdvancedSetting -Name UserVars.ESXiShellInteractiveTimeOut | Set-AdvancedSetting -Value 900
+Set a timeout to limit how long the ESXi Shell and SSH services are allowed to run
+#Get-VMHost | Get-AdvancedSetting -Name UserVars.ESXiShellTimeOut
+#Get-VMHost | Get-AdvancedSetting -Name UserVars.ESXiShellTimeOut | Set-AdvancedSetting -Value 900
+Ensure default setting for intra-VM TPS is correct
+#"Get-VMHost | Get-AdvancedSetting -Name Mem.ShareForceSalting
+"
+#"Get-VMHost | Get-AdvancedSetting -Name Mem.ShareForceSalting | Set-AdvancedSetting -Value 2
+"
+Verify Image Profile and VIB Acceptance Levels
+#"# List the Software AcceptanceLevel for each host
+Foreach ($VMHost in Get-VMHost ) { $ESXCli = Get-EsxCli -VMHost $VMHost $VMHost | Select Name, @{N="AcceptanceLevel";E={$ESXCli.software.acceptance.get()}}}
+# List only the vibs which are not at "VMwareCertified" or "VMwareAccepted" or "PartnerSupported" acceptance level
+Foreach ($VMHost in Get-VMHost ) { $ESXCli = Get-EsxCli -VMHost $VMHost $ESXCli.software.vib.list() | Where { ($_.AcceptanceLevel -ne "VMwareCertified") -and ($_.AcceptanceLevel -ne "VMwareAccepted") -and ($_.AcceptanceLevel -ne "PartnerSupported") }}"
+#"# Set the Software AcceptanceLevel for each host
+Foreach ($VMHost in Get-VMHost ) { $ESXCli = Get-EsxCli -VMHost $VMHost $ESXCli.software.acceptance.Set("VMwareCertified")}"
+Explicitly disable copy/paste operations
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.copy.disable" | where {$_.value -eq "false"} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.copy.disable" -value $true"
+Explicitly disable copy/paste operations
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.dnd.disable" | where {$_.value –eq “false”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.dnd.disable" -value $true"
+Explicitly disable copy/paste operations
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name  "isolation.tools.setGUIOptions.enable" | where {$_.value –eq “false”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.setGUIOptions.enable" -value $false"
+Explicitly disable copy/paste operations
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.paste.disable" | where {$_.value –eq “false”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.paste.disable" -value $true"
+Disable virtual disk shrinking
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.diskShrink.disable" | where {$_.value –eq “false”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.diskShrink.disable" -value $true"
+Disable virtual disk shrinking
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.diskWiper.disable" | where {$_.value –eq “false”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.diskWiper.disable" -value $true"
+Disable HGFS file transfers
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.hgfsServerSet.disable" | where {$_.value –eq “false”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.hgfsServerSet.disable" -value $true"
+Avoid using independent nonpersistent disks
+#"#List the VM's and their disk types
+Get-VM | Get-HardDisk | where {$_.Persistence –ne “Persistent”} | Select Parent, Name, Filename, DiskType, Persistence"
+#"#Alter the parameters for the following cmdlet to set the VM Disk Type:
+Get-VM  | Get-HardDisk | Set-HardDisk"
+Disable 3D features on Server and desktop virtual machines
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name  "mks.enable3d"| Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "mks.enable3d" -value $false"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.ghi.autologon.disable"| where {$_.Value –eq “True”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.ghi.autologon.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.ghi.launchmenu.change" | where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.ghi.launchmenu.change" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.memSchedFakeSampleStats.disable" | where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.memSchedFakeSampleStats.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.ghi.protocolhandler.info.disable" | where {$_.Value –eq “False”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.ghi.protocolhandler.info.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.ghi.host.shellAction.disable" | where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.ghi.host.shellAction.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.ghi.trayicon.disable"| where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.ghi.trayicon.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.unity.disable"| where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.unity.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.unityInterlockOperation.disable"| where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.unityInterlockOperation.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.unity.push.update.disable" | where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.unity.push.update.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.unity.taskbar.disable" | where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.unity.taskbar.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.unityActive.disable" | where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.unityActive.disable" -value $True"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.unity.windowContents.disable" | where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.unity.windowContents.disable" -value $True"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.vmxDnDVersionGet.disable"| where {$_.Value –eq “False”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.vmxDnDVersionGet.disable" -value $true"
+Disable certain unexposed features
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "isolation.tools.guestDnDVersionSet.disable"| where {$_.Value –eq “False”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "isolation.tools.guestDnDVersionSet.disable" -value $true"
+Disconnect unauthorized devices
+#"# Check for Floppy Devices attached to VMs
+Get-VM | Get-FloppyDrive | Select Parent, Name, ConnectionState"
+#"# Remove all Floppy drives attached to VMs
+Get-VM | Get-FloppyDrive | Remove-FloppyDrive"
+Disconnect unauthorized devices
+#"# In this Example you will need to add the functions from this post: http://blogs.vmware.com/vipowershell/2012/05/working-with-vm-devices-in-powercli.html
+# Check for Parallel ports attached to VMs
+Get-VM | Get-ParallelPort"
+#"# In this Example you will need to add the functions from this post: http://blogs.vmware.com/vipowershell/2012/05/working-with-vm-devices-in-powercli.html
+# Remove all Parallel Ports attached to VMs
+Get-VM | Get-ParallelPort | Remove-ParallelPort"
+Disconnect unauthorized devices
+#"# In this Example you will need to add the functions from this post: http://blogs.vmware.com/vipowershell/2012/05/working-with-vm-devices-in-powercli.html
+# Check for Serial ports attached to VMs
+Get-VM | Get-SerialPort"
+#"# In this Example you will need to add the functions from this post: http://blogs.vmware.com/vipowershell/2012/05/working-with-vm-devices-in-powercli.html
+# Remove all Serial Ports attached to VMs
+Get-VM | Get-SerialPort | Remove-SerialPort"
+Disable all but VGA mode on specific virtual machines
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "svga.vgaOnly " | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "svga.vgaOnly" -value $true"
+Limit informational messages from the VM to the VMX file
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "tools.setInfo.sizeLimit" | where {$_.Value –gt “1048576”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "tools.setInfo.sizeLimit" -value 1048576"
+Control access to VM console via VNC protocol
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "RemoteDisplay.vnc.enabled" | where {$_.Value –eq “True”} |  Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "RemoteDisplay.vnc.enabled" -value $false"
+Do not send host information to guests
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name  "tools.guestlib.enableHostInfo"| where {$_.Value –eq “True”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "tools.guestlib.enableHostInfo" -value $false"
+Check for enablement of salted VM's that are sharing memory pages
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "Mem.ShareForceSalting" | where {$_.Value –eq “1”} | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+$ vmsaltvalue = "<some unique value>"
+Get-VM | New-AdvancedSetting -Name "sched.mem.pshare.salt" -value $vmsaltvalue"
+Control access to VMs through the dvfilter network APIs
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name  "ethernet*.filter*.name*" | Select Entity, Name, Value"
+#
+Audit all uses of PCI or PCIe passthrough functionality
+#"# List the VMs and their current settings
+Get-VM | Get-AdvancedSetting -Name "pciPassthru*.present" | Select Entity, Name, Value"
+#"# Add the setting to all VMs
+Get-VM | New-AdvancedSetting -Name "pciPassthru*.present" -value """
+Enable BPDU filter on the ESXi host to prevent being locked out of physical switch ports with Portfast and BPDU Guard enabled
+#Get-VMHost | Get-AdvancedSetting -Name Net.BlockGuestBPDU
+#Get-VMHost | Get-AdvancedSetting -Name Net.BlockGuestBPDU | Set-AdvancedSetting -Value 1
+Enable VDS network healthcheck only if you need it
+#"$vds = Get-VDSwitch
+$vds.ExtensionData.Config.HealthCheckConfig"
+#"Get-View -ViewType DistributedVirtualSwitch | ?{($_.config.HealthCheckConfig | ?{$_.enable -notmatch "False"})}| %{$_.UpdateDVSHealthCheckConfig(@((New-Object Vmware.Vim.VMwareDVSVlanMtuHealthCheckConfig -property @{enable=0}),(New-Object Vmware.Vim.VMwareDVSTeamingHealthCheckConfig -property @{enable=0})))}"
+Ensure that the “Forged Transmits” policy is set to reject
+#"Get-VDSwitch | Get-VDSecurityPolicy
+Get-VDPortgroup | ?{$_.IsUplink -eq $false} | Get-VDSecurityPolicy"
+#"Get-VDSwitch | Get-VDSecurityPolicy | Set-VDSecurityPolicy -ForgedTransmits $false
+
+Get-VDPortgroup | ?{$_.IsUplink -eq $false} | Get-VDSecurityPolicy | Set-VDSecurityPolicy -ForgedTransmits $false"
+Ensure that the “Forged Transmits” policy is set to reject
+#"Get-VirtualSwitch | Get-SecurityPolicy
+Get-VirtualPortGroup | Get-SecurityPolicy"
+#"Get-VirtualSwitch | Get-SecurityPolicy | Set-SecurityPolicy -ForgedTransmits $false 
+
+Get-VirtualPortGroup | Get-SecurityPolicy | Set-SecurityPolicy -ForgedTransmitsInherited $true"
+Ensure that the “MAC Address Changes” policy is set to reject
+#"Get-VDSwitch | Get-VDSecurityPolicy
+Get-VDPortgroup | Get-VDSecurityPolicy"
+#"Get-VDSwitch | Get-VDSecurityPolicy | Set-VDSecurityPolicy -MacChanges $false
+
+Get-VDPortgroup | Get-VDSecurityPolicy | Set-VDSecurityPolicy -MacChanges $false"
+Ensure that the “MAC Address Changes” policy is set to reject
+#"Get-VirtualSwitch | Get-SecurityPolicy
+Get-VirtualPortGroup | Get-SecurityPolicy"
+#"Get-VirtualSwitch | Get-SecurityPolicy | Set-SecurityPolicy -MacChanges $false
+
+Get-VirtualPortGroup | Get-SecurityPolicy | Set-SecurityPolicy -MacChangesInherited $true"
+Ensure that the “Promiscuous Mode” policy is set to reject
+#"Get-VDSwitch | Get-VDSecurityPolicy
+Get-VDPortgroup | Get-VDSecurityPolicy"
+#"Get-VDSwitch | Get-VDSecurityPolicy | Set-VDSecurityPolicy -AllowPromiscuous $false
+
+Get-VDPortgroup | Get-VDSecurityPolicy | Set-VDSecurityPolicy -AllowPromiscuous $false"
+Ensure that the “Promiscuous Mode” policy is set to reject
+#"Get-VirtualSwitch | Get-SecurityPolicy
+Get-VirtualPortGroup | Get-SecurityPolicy"
+#"Get-VirtualSwitch | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuous $false
+
+Get-VirtualPortGroup | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuousInherited $true"
+Ensure that VDS Netflow traffic is only being sent to authorized collector IPs
+#"Get-VDPortgroup | Select Name, VirtualSwitch, @{Name="NetflowEnabled";Expression={$_.Extensiondata.Config.defaultPortConfig.ipfixEnabled.Value}} | Where-Object {$_.NetflowEnabled -eq "True"}"
+#"# Disable Netfow for a VDPortgroup
+$DPortgroup = <name of portgroup>
+Get-VDPortgroup $DPortGroup | Disable-PGNetflow
+
+#Function for  Disable-PGNetflow
+#From: http://www.virtu-al.net/2013/07/23/disabling-netflow-with-powercli/
+
+Function Disable-PGNetflow {
+   [CmdletBinding()]
+   Param (
+      [Parameter(ValueFromPipeline=$true)]
+      $DVPG
+   )
+   Process {
+      Foreach ($PG in $DVPG) {
+         $spec = New-Object VMware.Vim.DVPortgroupConfigSpec
+         $spec.configversion = $PG.Extensiondata.Config.ConfigVersion
+         $spec.defaultPortConfig = New-Object VMware.Vim.VMwareDVSPortSetting
+         $spec.defaultPortConfig.ipfixEnabled = New-Object VMware.Vim.BoolPolicy
+         $spec.defaultPortConfig.ipfixEnabled.inherited = $false
+         $spec.defaultPortConfig.ipfixEnabled.value = $false
+ 
+         $PGView = Get-View -Id $PG.Id
+         $PGView.ReconfigureDVPortgroup_Task($spec)
+      }
+   }
+}
+ 
+# Disable Netfow for a VDPortgroup
+#Get-VDPortgroup DPortGroup | Disable-PGNetflow
+"
+Restrict port-level configuration overrides on VDS 
+#Get-VDPortgroup | Get-VDPortgroupOverridePolicy
+#
+Audit use of dvfilter network APIs
+#Get-VMHost | Get-AdvancedSetting -Name Net.DVFilterBindIpAddress
+#"Get-VMHost | Get-AdvancedSetting -Name Net.DVFilterBindIpAddress | Set-AdvancedSetting -Value """
