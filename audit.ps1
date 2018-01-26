@@ -1,3 +1,6 @@
+# address certificate issue at some point
+set-PowerCLIConfiguration -InvalidCertificateAction Ignore -Confirm:$false
+
 # Provide the username and password of an account on your ESXi hosts.
 $esxusername = "root"
 $esxpassword = "VMware1!"
@@ -9,7 +12,7 @@ $vCenterServer = "vcsa.lab.local"
 #Disconnect-VIServer -Force -server * -Confirm:$false
 
 # You may need to provide the username and password of your vCenter server below
-connect-viserver $vCenterServer
+connect-viserver $vCenterServer -user $esxusername -password $esxpassword
 $esxihosts = get-vmhost
 
 
