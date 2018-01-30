@@ -17,7 +17,7 @@ $vCpassword = "VMware1!"
 $esxusername = "root"
 $esxpassword = $vCpassword
 
-Write-Host "`n# ---------- Connecting to vCenter"
+Write-Host "# ---------- Connecting to vCenter"
 $vCconnection = connect-viserver $vCenterServer -user $vCusername -password $vCpassword | Out-Null
 $esxihosts = get-vmhost
 $esxivms = get-vm
@@ -25,7 +25,7 @@ $esxivms = get-vm
 Write-Host "`n# ---------- Start Audit`n"
 
 # establish direct connections to the esxi hosts
-Connect-VIserver -server $esxihosts -user $esxusername -password $esxpassword
+Connect-VIserver -server $esxihosts -user $esxusername -password $esxpassword | Out-Null
 
 Foreach ($VMHost in $esxihosts) {
     Write-Host "`n# ----- Checking host $VMHost ...`n"
@@ -87,17 +87,21 @@ Foreach ($VMHost in $esxihosts) {
     $lockdown = Get-View $myhost.ConfigManager.HostAccessManager
     $lockdown.UpdateViewData()
     $lockdownstatus = $lockdown.LockdownMode
-    Write-Host "Lockdown mode is set to $lockdownstatus"
+    Write-Host "$lockdownstatus"
 
     Write-Host "`n# List the services which are enabled and have rules defined for specific IP ranges to access the service"
     $withrules = $VMHost | Get-VMHostFirewallException | Where {$_.Enabled -and (-not $_.ExtensionData.AllowedHosts.AllIP)}
-    Write-Host $withrules
-    Write-Host $withrules.extensiondata.allowedhosts
+    Foreach ($withrule in $withrules) {
+        Write-Host $withrule
+        Write-Host $withrule.extensiondata.allowedhosts.ipaddress
+    }
 
     Write-Host "`n# List the services which are enabled and do not have rules defined for specific IP ranges to access the service"
     $withoutrules = $VMHost | Get-VMHostFirewallException | Where {$_.Enabled -and ($_.ExtensionData.AllowedHosts.AllIP)}
-    Write-Host $withoutrules
-    Write-Host $withoutrules.extensiondata.allowedhosts
+    Foreach ($withoutrule in $withtoutrules) {
+        Write-Host $withoutrule
+        Write-Host $withoutrule.extensiondata.allowedhosts.ipaddress
+    }
 
     Write-Host "`n# Set the time after which a locked account is automatically unlocked"
     $VMHost | Get-AdvancedSetting -Name Security.AccountUnlockTime | Select Name, Value
