@@ -1,5 +1,4 @@
 # version 0
-#
 
 Write-Host "`n# ---------- Dropping all connections if any"
 Disconnect-VIServer -Force -server * -Confirm:$false
@@ -49,7 +48,7 @@ Foreach ($VMHost in $esxihosts) {
         Write-Output "SSH Server on host $VMhost is Stopped"
     }
 
-    Write-Host "# Check the NTP Setting"
+    Write-Host "`n# Check the NTP Setting"
     $VMHost | Select @{N="NTP";E={$_ | Get-VMHostNtpServer}}
 
     Write-Host "# Check Syslog.global.logDir"
@@ -134,7 +133,7 @@ Foreach ($VMHost in $esxihosts) {
     #        -and ($_.AcceptanceLevel -ne "PartnerSupported") }
     Write-Host "this check is erroring out, disabling it for now"
 
-    Write-Host "# BPDU filter (prevents being locked out of physical switch ports with Portfast and BPDU Guard enabled)"
+    Write-Host "`n# BPDU filter (prevents being locked out of physical switch ports with Portfast and BPDU Guard enabled)"
     $VMHost | Get-AdvancedSetting -Name Net.BlockGuestBPDU | Select Name, Value
 
     Write-Host "# Audit use of dvfilter network APIs"
@@ -184,6 +183,9 @@ Foreach ($VMHost in $esxihosts) {
         Write-Host "`tPromiscuous mode enabled:" $vSwitch.Extensiondata.Config.DefaultPortConfig.SecurityPolicy.AllowPromiscuous.Value
         Write-Host "`tForged transmits enabled:" $vSwitch.Extensiondata.Config.DefaultPortConfig.SecurityPolicy.ForgedTransmits.Value
         Write-Host "`tMAC Changes enabled:" $vSwitch.Extensiondata.Config.DefaultPortConfig.SecurityPolicy.MacChanges.Value
+        Write-Host "`n# VDS network healthcheck seting"
+        #$vds = Get-VDSwitch
+        $vSwitch.ExtensionData.Config.HealthCheckConfig
 
         foreach($portgroup in (Get-VirtualPortGroup -Distributed -VirtualSwitch $vSwitch)){
             Write-Host "`n`t`t"$portgroup.Name
@@ -198,70 +200,105 @@ Foreach ($VMHost in $esxihosts) {
             $portgroup | Get-VDPortgroupOverridePolicy
         }
     }
-
-    Write-Host "# Check VDS network healthcheck"
-    $vds = Get-VDSwitch
-    $vds.ExtensionData.Config.HealthCheckConfig
-    Get-View -ViewType DistributedVirtualSwitch
 }
 
-exit
+Write-Host "# ----- Starting VM checks"
 
-##### VM Check Section
 Foreach ($VM in $esxivms) {
-    Write-Host "- Checking $VM ..."
-    Write-Host "isolation.tools.copy.disable"
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.copy.disable" | where {$_.value -eq "false"} | Select Entity, Name, Value
+    Write-Host "- Checking VM settings: $VM"
+    Write-Host "- NOTE: if no data is returned then this setting has not been created`n"
+    Write-Host "# isolation.tools.copy.disable"
+    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.copy.disable" | Select Entity, Name, Value
 
-    Write-Host "isolation.tools.dnd.disable"
+    Write-Host "# isolation.tools.dnd.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.dnd.disable" | where {$_.value -eq "false"} | Select Entity, Name, Value
 
-    Write-Host "isolation.tools.setGUIOptions.enable"
+    Write-Host "# isolation.tools.setGUIOptions.enable"
     Get-AdvancedSetting -Entity $VM -Name  "isolation.tools.setGUIOptions.enable" | where {$_.value -eq "false"} |  Select Entity, Name, Value
 
-    Write-Host "isolation.tools.paste.disable"
+    Write-Host "# isolation.tools.paste.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.paste.disable" | where {$_.value -eq "false"} | Select Entity, Name, Value
 
-    Write-Host "VM disk shrink setting"
+    Write-Host "# VM disk shrink setting"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.diskShrink.disable" | where {$_.value -eq "false"} | Select Entity, Name, Value
 
-    Write-Host "VM disk wiper setting"
+    Write-Host "# VM disk wiper setting"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.diskWiper.disable" | where {$_.value -eq "false"} | Select Entity, Name, Value
 
-    Write-Host "VM HGFS setting"
+    Write-Host "# VM HGFS setting"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.hgfsServerSet.disable" | where {$_.value -eq "false"} | Select Entity, Name, Value
 
     #Write-Host "VM disk types"
     #Get-HardDisk | where {$_.Persistence -ne "Persistent"} | Select Parent, Name, Filename, DiskType, Persistence
 
-    Write-Host "List VM 3D settings"
+    Write-Host "# mks.enable3d"
     Get-AdvancedSetting -Entity $VM -Name  "mks.enable3d"| Select Entity, Name, Value
 
-    Write-Host "List VM autologon setting"
+    Write-Host "# List VM autologon setting"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.ghi.autologon.disable"| where {$_.Value -eq "True"} | Select Entity, Name, Value
 
-    Write-Host "List VM settings"
+    Write-Host "# isolation.tools.ghi.launchmenu.change"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.ghi.launchmenu.change" | where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.memSchedFakeSampleStats.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.memSchedFakeSampleStats.disable" | where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+
+    Write-Host "# isolation.tools.ghi.protocolhandler.info.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.ghi.protocolhandler.info.disable" | where {$_.Value -eq "False"} | Select Entity, Name, Value
+
+    Write-Host "# isolation.ghi.host.shellAction.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.ghi.host.shellAction.disable" | where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.ghi.trayicon.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.ghi.trayicon.disable"| where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.unity.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unity.disable"| where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.unityInterlockOperation.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unityInterlockOperation.disable"| where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.unity.push.update.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unity.push.update.disable" | where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.unity.taskbar.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unity.taskbar.disable" | where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.unityActive.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unityActive.disable" | where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.unity.windowContents.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unity.windowContents.disable" | where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.vmxDnDVersionGet.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.vmxDnDVersionGet.disable"| where {$_.Value -eq "False"} | Select Entity, Name, Value
+
+    Write-Host "# isolation.tools.guestDnDVersionSet.disable"
     Get-AdvancedSetting -Entity $VM -Name "isolation.tools.guestDnDVersionSet.disable"| where {$_.Value -eq "False"} |  Select Entity, Name, Value
+
     #Get-FloppyDrive | Select Parent, Name, ConnectionState
     #Get-VM | Get-ParallelPort
     #Get-VM | Get-SerialPort
-    Get-AdvancedSetting -Entity $VM -Name "svga.vgaOnly " | Select Entity, Name, Value
+
+    Write-Host "# svga.vgaOnly"
+    Get-AdvancedSetting -Entity $VM -Name "svga.vgaOnly" | Select Entity, Name, Value
+
+    Write-Host "# tools.setInfo.sizeLimit"
     Get-AdvancedSetting -Entity $VM -Name "tools.setInfo.sizeLimit" | where {$_.Value -gt "1048576"} |  Select Entity, Name, Value
+
+    Write-Host "# RemoteDisplay.vnc.enabled"
     Get-AdvancedSetting -Entity $VM -Name "RemoteDisplay.vnc.enabled" | where {$_.Value -eq "True"} |  Select Entity, Name, Value
-    Get-AdvancedSetting -Entity $VM -Name  "tools.guestlib.enableHostInfo"| where {$_.Value -eq "True"} | Select Entity, Name, Value
+
+    Write-Host "# tools.guestlib.enableHostInfo"
+    Get-AdvancedSetting -Entity $VM -Name "tools.guestlib.enableHostInfo"| where {$_.Value -eq "True"} | Select Entity, Name, Value
+
+    Write-Host "# Mem.ShareForceSalting"
     Get-AdvancedSetting -Entity $VM -Name "Mem.ShareForceSalting" | where {$_.Value -eq "1"} | Select Entity, Name, Value
+
+    Write-Host "# ethernet*.filter*.name*"
     Get-AdvancedSetting -Entity $VM -Name  "ethernet*.filter*.name*" | Select Entity, Name, Value
+
+    Write-Host "# pciPassthru*.present"
     Get-AdvancedSetting -Entity $VM -Name "pciPassthru*.present" | Select Entity, Name, Value
 }
