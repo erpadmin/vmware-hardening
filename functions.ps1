@@ -113,3 +113,10 @@ function get-guideline([String] $pattern) {
    '# ' + '{0,-38}{1,-40}{2,-30}{3,-30}' -f $mymatch.split('~')
 
 }
+
+
+function get-vm-setting([String] $setting) {
+    Write-Host "`n# - Checking $setting"
+    get-guideline($setting)
+    Get-AdvancedSetting -Entity $VM -Name $setting | Select Entity, Name, Value | ft
+}
