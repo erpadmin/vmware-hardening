@@ -89,3 +89,27 @@ Function Remove-ParallelPort {
         $VM.ExtensionData.ReconfigVM_Task($VMSpec)
     }
 }
+
+
+# other
+function get-guideline([String] $pattern) {
+    $mymatch=''
+    if (!$pattern) {
+        return
+    }
+    $DAT | % {
+        if ($_ -cmatch $pattern) {
+            $mymatch += ($_ | Out-String -stream)
+        }
+    }
+
+    if (!$mymatch) {
+        return
+    }
+
+   "#"
+   '{0,-40}{1,-40}{2,-30}{3,-30}' -f "# Guideline", "Parameter", "Desired Value", "Host Profile capable"
+   '{0,-40}{1,-40}{2,-30}{3,-30}' -f "# ----------", "---------", "-------------", "--------------------"
+   '# ' + '{0,-38}{1,-40}{2,-30}{3,-30}' -f $mymatch.split('~')
+
+}
