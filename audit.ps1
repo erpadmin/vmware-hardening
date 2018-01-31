@@ -20,7 +20,7 @@ $esxpassword = $vCpassword
 # ---------- Connecting to vCenter"
 $vCconnection = connect-viserver $vCenterServer -user $vCusername -password $vCpassword | Out-Null
 $esxihosts = get-vmhost # -name <specific host>
-$esxivms = get-vm -name # -name <specific vm>
+$esxivms = get-vm # -name <specific vm>
 
 # ---------- Start Audit`n"
 $DAT = Get-Content "./settings.dat" | Select-Object -Skip 1
@@ -239,127 +239,44 @@ Write-Host "`n# ----- Starting VM checks"
 Foreach ($VM in $esxivms) {
     Write-Host "- Checking VM settings: $VM"
     Write-Host "- NOTE: if no data is returned then this setting has not been created`n"
-    Write-Host "`n# isolation.tools.copy.disable"
-    get-guideline('isolation.tools.copy.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.copy.disable" | Select Entity, Name, Value | ft
 
-    Write-Host "`n# isolation.tools.dnd.disable"
-    get-guideline('isolation.tools.dnd.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.dnd.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.setGUIOptions.enable"
-    get-guideline('isolation.tools.setGUIOptions.enable')
-    Get-AdvancedSetting -Entity $VM -Name  "isolation.tools.setGUIOptions.enable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.paste.disable"
-    get-guideline('isolation.tools.paste.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.paste.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# VM disk shrink setting"
-    get-guideline('isolation.tools.diskShrink.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.diskShrink.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# VM disk wiper setting"
-    get-guideline('isolation.tools.diskWiper.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.diskWiper.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# VM HGFS setting"
-    get-guideline('isolation.tools.hgfsServerSet.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.hgfsServerSet.disable" | Select Entity, Name, Value | ft
+    get-vm-setting('isolation.tools.copy.disable')
+    get-vm-setting('isolation.tools.dnd.disable')
+    get-vm-setting('isolation.tools.setGUIOptions.enable')
+    get-vm-setting('isolation.tools.paste.disable')
+    get-vm-setting('isolation.tools.diskShrink.disable')
+    get-vm-setting('isolation.tools.diskWiper.disable')
+    get-vm-setting('isolation.tools.hgfsServerSet.disable')
 
     #Write-Host "VM disk types"
     #Get-HardDisk | where {$_.Persistence -ne "Persistent"} | Select Parent, Name, Filename, DiskType, Persistence
+    #get-vm-setting('')
 
-    Write-Host "`n# mks.enable3d"
-    get-guideline('mks.enable3d')
-    Get-AdvancedSetting -Entity $VM -Name "mks.enable3d"| Select Entity, Name, Value | ft
-
-    Write-Host "`n# List VM autologon setting"
-    get-guideline('isolation.tools.ghi.autologon.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.ghi.autologon.disable"| Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.ghi.launchmenu.change"
-    get-guideline('isolation.tools.ghi.launchmenu.change')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.ghi.launchmenu.change" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.memSchedFakeSampleStats.disable"
-    get-guideline('isolation.tools.memSchedFakeSampleStats.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.memSchedFakeSampleStats.disable" | Select Entity, Name, Value | ft
-
-
-    Write-Host "`n# isolation.tools.ghi.protocolhandler.info.disable"
-    get-guideline('isolation.tools.ghi.protocolhandler.info.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.ghi.protocolhandler.info.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.ghi.host.shellAction.disable"
-    get-guideline('isolation.ghi.host.shellAction.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.ghi.host.shellAction.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.ghi.trayicon.disable"
-    get-guideline('isolation.tools.ghi.trayicon.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.ghi.trayicon.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.unity.disable"
-    get-guideline('isolation.tools.unity.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unity.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.unityInterlockOperation.disable"
-    get-guideline('isolation.tools.unityInterlockOperation.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unityInterlockOperation.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.unity.push.update.disable"
-    get-guideline('isolation.tools.unity.push.update.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unity.push.update.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.unity.taskbar.disable"
-    get-guideline('isolation.tools.unity.taskbar.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unity.taskbar.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.unityActive.disable"
-    get-guideline('isolation.tools.unityActive.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unityActive.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.unity.windowContents.disable"
-    get-guideline('isolation.tools.unity.windowContents.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.unity.windowContents.disable" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.vmxDnDVersionGet.disable"
-    get-guideline('isolation.tools.vmxDnDVersionGet.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.vmxDnDVersionGet.disable"| Select Entity, Name, Value | ft
-
-    Write-Host "`n# isolation.tools.guestDnDVersionSet.disable"
-    get-guideline('isolation.tools.guestDnDVersionSet.disable')
-    Get-AdvancedSetting -Entity $VM -Name "isolation.tools.guestDnDVersionSet.disable"| Select Entity, Name, Value | ft
+    get-vm-setting('mks.enable3d')
+    get-vm-setting('isolation.tools.ghi.autologon.disable')
+    get-vm-setting('isolation.tools.ghi.launchmenu.change')
+    get-vm-setting('isolation.tools.memSchedFakeSampleStats.disable')
+    get-vm-setting('isolation.tools.ghi.protocolhandler.info.disable')
+    get-vm-setting('isolation.ghi.host.shellAction.disable')
+    get-vm-setting('isolation.tools.ghi.trayicon.disable')
+    get-vm-setting('isolation.tools.unity.disable')
+    get-vm-setting('isolation.tools.unityInterlockOperation.disable')
+    get-vm-setting('isolation.tools.unity.push.update.disable')
+    get-vm-setting('isolation.tools.unity.taskbar.disable')
+    get-vm-setting('isolation.tools.unity.windowContents.disable')
+    get-vm-setting('isolation.tools.vmxDnDVersionGet.disable')
+    get-vm-setting('isolation.tools.guestDnDVersionSet.disable')
 
     #Get-FloppyDrive | Select Parent, Name, ConnectionState
     #Get-VM | Get-ParallelPort
     #Get-VM | Get-SerialPort
+    #get-vm-setting('')
 
-    Write-Host "`n# svga.vgaOnly"
-    get-guideline('svga.vgaOnly')
-    Get-AdvancedSetting -Entity $VM -Name "svga.vgaOnly" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# tools.setInfo.sizeLimit"
-    get-guideline('tools.setInfo.sizeLimit')
-    Get-AdvancedSetting -Entity $VM -Name "tools.setInfo.sizeLimit" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# RemoteDisplay.vnc.enabled"
-    get-guideline('RemoteDisplay.vnc.enabled')
-    Get-AdvancedSetting -Entity $VM -Name "RemoteDisplay.vnc.enabled" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# tools.guestlib.enableHostInfo"
-    get-guideline('tools.guestlib.enableHostInfo')
-    Get-AdvancedSetting -Entity $VM -Name "tools.guestlib.enableHostInfo"| Select Entity, Name, Value | ft
-
-    Write-Host "`n# Mem.ShareForceSalting"
-    get-guideline('Mem.ShareForceSalting')
-    Get-AdvancedSetting -Entity $VM -Name "Mem.ShareForceSalting" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# ethernet*.filter*.name*"
-    get-guideline('ethernetX.filterX.name')
-    Get-AdvancedSetting -Entity $VM -Name  "ethernet*.filter*.name*" | Select Entity, Name, Value | ft
-
-    Write-Host "`n# pciPassthru*.present"
-    get-guideline('pciPassthru')
-    Get-AdvancedSetting -Entity $VM -Name "pciPassthru*.present" | Select Entity, Name, Value | ft
+    get-vm-setting('svga.vgaOnly')
+    get-vm-setting('tools.setInfo.sizeLimit')
+    get-vm-setting('RemoteDisplay.vnc.enabled')
+    get-vm-setting('tools.guestlib.enableHostInfo')
+    get-vm-setting('Mem.ShareForceSalting')
+    get-vm-setting('ethernet*.filter*.name*')
+    get-vm-setting('pciPassthru*.present')
 }
