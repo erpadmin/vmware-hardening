@@ -1,7 +1,9 @@
 # version 0.1
 
 # ---------- Dropping all connections if any"
-Disconnect-VIServer -Force -server * -Confirm:$false
+if ($global:defaultVIServers) {
+    Disconnect-VIServer -Force -server * -Confirm:$false -ErrorAction SilentlyContinue
+}
 
 # ---------- Setting up prerequistes"
 . ./functions.ps1
