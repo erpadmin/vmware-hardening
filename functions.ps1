@@ -94,9 +94,16 @@ Function Remove-ParallelPort {
 # other
 function get-guideline([String] $pattern) {
     $mymatch=''
+
+    if (!$DAT) {
+        Write-Host "error, dat not initialized"
+        return
+    }
+
     if (!$pattern) {
         return
     }
+
     $DAT | % {
         if ($_ -cmatch $pattern) {
             $mymatch += ($_ | Out-String -stream)
@@ -107,16 +114,25 @@ function get-guideline([String] $pattern) {
         return
     }
 
+
+    $cols = $mymatch.split('~')
+    for ($i=0; $i -le 1; $i++) {
+        if ($cols[$i].length -ge 34) {
+            $tstr = $cols[$i].substring($cols[$i].length - 34)
+            $cols[$i] = "..." + $tstr
+        }
+        $mymatch = ($cols -join('~'))
+    }
+
    "#"
    '{0,-40}{1,-40}{2,-30}{3,-30}' -f "# Guideline", "Parameter", "Desired Value", "Host Profile capable"
    '{0,-40}{1,-40}{2,-30}{3,-30}' -f "# ----------", "---------", "-------------", "--------------------"
    '# ' + '{0,-38}{1,-40}{2,-30}{3,-30}' -f $mymatch.split('~')
-
 }
 
 
 function get-vm-setting([String] $setting) {
-    Write-Host "`n# - Checking $setting"
+    #Write-Host "`n# - Checking $setting"
     get-guideline($setting)
     Get-AdvancedSetting -Entity $VM -Name $setting | Select Entity, Name, Value | ft
 }
